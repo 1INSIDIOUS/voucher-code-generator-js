@@ -19,6 +19,10 @@
         return arr[randomInt(0, arr.length - 1)];
     }
 
+    function sequenceElem(config, sequenceOffset, charIndex) {
+        return config.charset[Math.floor(sequenceOffset / Math.pow(config.charset.length, config.length - charIndex - 1)) % config.charset.length];
+    }
+
     function charset(name) {
         var charsets = {
             numbers: "0123456789",
@@ -44,12 +48,21 @@
         this.prefix = config.prefix || "";
         this.postfix = config.postfix || "";
         this.pattern = config.pattern || repeat("#", this.length);
+
+        if (config.pattern) {
+            this.length = (config.pattern.match(/#/g) || []).length;
+        }
     }
 
-    function generateOne(config) {
+    function generateOne(config, sequenceOffset) {
+        var generateIndex = 0;
+
         var code = config.pattern.split('').map(function(char) {
             if (char === '#') {
-                return randomElem(config.charset);
+                if (isNaN(sequenceOffset)) {
+                    return randomElem(config.charset);
+                }
+                return sequenceElem(config, sequenceOffset, generateIndex++);
             } else {
                 return char;
             }
@@ -57,23 +70,38 @@
         return config.prefix + code + config.postfix;
     }
 
-    function isFeasible(charset, pattern, count) {
-        return Math.pow(charset.length, (pattern.match(/#/g) || []).length) >= count;
+    function maxCombinationsCount (config) {
+        return Math.pow(config.charset.length, config.length);
     }
 
-    function generate(config) {
+    function isFeasible(config) {
+        return maxCombinationsCount(config) >= config.count;
+    }
+
+    function generate(config, sequenceOffset) {
         config = new Config(config);
         var count = config.count;
-        if (!isFeasible(config.charset, config.pattern, config.count)) {
+        if (!isFeasible(config)) {
             throw new Error("Not possible to generate requested number of codes.");
+        }
+
+        sequenceOffset = +sequenceOffset;
+
+        if (!isNaN(sequenceOffset)) {
+            if (sequenceOffset < 0) {
+                sequenceOffset = 0;
+            } else if (sequenceOffset >= maxCombinationsCount(config)) {
+                sequenceOffset = maxCombinationsCount(config) - 1;
+            }
         }
 
         var codes = {};
         while (count > 0) {
-            var code = generateOne(config);
+            var code = generateOne(config, sequenceOffset);
             if (codes[code] === undefined) {
                 codes[code] = true;
                 count--;
+                sequenceOffset++;
             }
         }
         return Object.keys(codes);
